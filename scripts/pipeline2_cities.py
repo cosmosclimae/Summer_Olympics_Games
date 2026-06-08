@@ -30,14 +30,16 @@ TIME_DIM = "valid_time"
 # lon in -180..180 to match the grid
 # ----------------------------------------------------------------------
 CITIES = {
-    "Rio de Janeiro": (-22.91, -43.20),
+    # Rio & Cape Town nudged to nearest ERA5-Land LAND cell (0.1deg grid masks
+    # the exact city centre as sea); land cells verified via diag_landmask.py.
+    "Rio de Janeiro": (-22.90, -43.10),   # was -22.91,-43.20 (sea in ERA5-Land)
     "Tokyo":          ( 35.68, 139.69),
     "Paris":          ( 48.86,   2.35),
     "Los Angeles":    ( 34.05, -118.24),
     "Brisbane":       (-27.47, 153.03),
     "Ahmedabad":      ( 23.03,  72.58),
     "Doha":           ( 25.29,  51.53),
-    "Cape Town":      (-33.92,  18.42),
+    "Cape Town":      (-33.90,  18.50),   # was -33.92,18.42 (sea in ERA5-Land)
 }
 
 # Olympic session windows (local solar hour) for Fig 3 shading
@@ -60,28 +62,28 @@ def extract_city(lat, lon, data_dir, domain, years):
             ds = xr.open_dataset(fname)
             pt = ds.sel(latitude=lat, longitude=lon, method="nearest")
 
-            # ERA5-Land masks sea cells as NaN. If the nearest cell is mostly
-            # NaN, search a small window for the closest valid (land) cell.
-            t2m_test = pt["t2m"]
-            frac_nan = float(np.isnan(t2m_test).mean())
-            if frac_nan > 0.5:
+            # ERA5-Land masks sea cells as NaN (the mask is time-invariant, so
+            # test the first hour). If the nearest cell is sea, search a window
+            # for the closest valid land cell.
+            is_sea = bool(np.isnan(pt["t2m"].isel({TIME_DIM: 0})))
+            if is_sea:
+                wdeg = 0.6
                 win = ds.sel(
-                    latitude=slice(lat + 0.3, lat - 0.3),   # lat descending
-                    longitude=slice(lon - 0.3, lon + 0.3),
+                    latitude=slice(lat + wdeg, lat - wdeg),   # lat descending
+                    longitude=slice(lon - wdeg, lon + wdeg),
                 )
                 land = win["t2m"].isel({TIME_DIM: 0}).notnull()
                 if bool(land.any()):
-                    la = land.where(land, drop=True)
-                    # nearest valid cell by simple distance
-                    glat = la["latitude"].values
-                    glon = la["longitude"].values
-                    LO, LA = np.meshgrid(glon, glat)
-                    d = (LA - lat) ** 2 + (LO - lon) ** 2
-                    j, i = np.unravel_index(np.argmin(d), d.shape)
-                    pt = win.sel(latitude=glat[j], longitude=glon[i],
+                    la = win["latitude"].values
+                    lo = win["longitude"].values
+                    LO, LA = np.meshgrid(lo, la)
+                    dist = np.sqrt((LA - lat) ** 2 + (LO - lon) ** 2)
+                    dist[~land.values] = np.inf
+                    j, i = np.unravel_index(np.argmin(dist), dist.shape)
+                    pt = win.sel(latitude=la[j], longitude=lo[i],
                                  method="nearest")
-                    frac_nan = float(np.isnan(pt["t2m"]).mean())
 
+            frac_nan = float(np.isnan(pt["t2m"]).mean())
             nan_report.append(frac_nan)
 
             ssrd_flux = w.deaccumulate_ssrd(pt["ssrd"], time_dim=TIME_DIM)
