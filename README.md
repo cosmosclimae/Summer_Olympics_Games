@@ -24,7 +24,6 @@ The workflow uses hourly ERA5-Land reanalysis data for July and August over the 
 * 2 m dew point temperature or relative humidity;
 * 10 m wind components;
 * surface solar radiation downward;
-* precipitation, where relevant.
 
 Input files are expected to be provided as NetCDF files organised by year and month. The original ERA5-Land data are not redistributed in this repository.
 
@@ -57,12 +56,9 @@ The workflow is intended to be run year by year to reduce memory usage and facil
 
 ```text
 .
-├── config/              # Configuration files and city/venue metadata
-├── data/                # Local input and intermediate data folders, not versioned
 ├── scripts/             # Processing and analysis scripts
-├── workflow/            # Snakemake workflow files, if applicable
-├── results/             # Derived outputs, tables and figure-ready files
-├── figures/             # Figures generated for the manuscript
+├── SNAKEworkflow_file            # Snakemake workflow files, if applicable
+├── results/ on Zenodo             # Derived outputs, tables and figure-ready files
 └── README.md            # Repository documentation
 ```
 
